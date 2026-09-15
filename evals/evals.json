@@ -1,0 +1,54 @@
+{
+  "skill_name": "subnotes",
+  "evals": [
+    {
+      "id": 0,
+      "name": "booteo",
+      "prompt": "quiero que aprendas a escribir mis notas de substack como las escribo yo. mi perfil es https://substack.com/@chrisbest — bajate lo que he publicado y dime que ves en mi forma de escribir",
+      "expected_output": "Descarga real del histórico a una base SQLite, muestra mezclada, preguntas solo sobre lo que los datos no responden, y un VOZ.md con rasgos apoyados en ids de notas reales.",
+      "files": [],
+      "assertions": [
+        "Descarga las notas de verdad: deja un notes.db con al menos 10 notas del perfil pedido",
+        "Escribe VOZ.md en la carpeta de estado del handle",
+        "VOZ.md apoya sus rasgos en ids de notas que existen realmente en la base (>=4 ids validos)",
+        "Registra el perfil de voz en la base (voice_version no nulo)",
+        "La respuesta declara que impresiones, alcance y suscriptores por nota NO estan en estos datos",
+        "La respuesta enseña lo inferido para que el usuario lo corrija, o lista lo que preguntaria"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "escribir",
+      "prompt": "escribeme una nota sobre por que las relaciones directas con los lectores valen mas que el alcance",
+      "expected_output": "Tres variantes en bloques de código listos para copiar, con formatos tomados del ranking real del autor, tono elegido por el modelo y longitud dentro de su rango habitual.",
+      "files": [
+        "fixtures/hamish (notes.db + VOZ.md)"
+      ],
+      "assertions": [
+        "Entrega tres variantes, cada una en su propio bloque de codigo",
+        "Dentro de los bloques solo va el texto publicable (sin 'Variante', sin recuento de caracteres, sin comillas envolventes)",
+        "Cada variante declara fuera del bloque su formato y su tono",
+        "Los formatos citados son slugs que existen en el ranking real del autor",
+        "Al menos dos variantes caen dentro del rango habitual de longitud del autor (15-215 caracteres)",
+        "Comprueba el historico y dice si el tema ya salio, citando ids si los hay",
+        "No presenta impresiones, alcance ni suscriptores como si fueran datos disponibles"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "historico",
+      "prompt": "oye antes de escribir nada: ¿ya he hablado de Substack TV en mis notas? y de paso dime que formato me esta funcionando mejor",
+      "expected_output": "Encuentra la nota real sobre Substack TV con su id y fecha, y da el ranking de formatos marcando los que tienen poca muestra.",
+      "files": [
+        "fixtures/hamish (notes.db + VOZ.md)"
+      ],
+      "assertions": [
+        "Encuentra la nota real sobre Substack TV con su id (#297269951) y su fecha (2026-07-18)",
+        "Da el ranking de formatos con la mediana de reacciones de cada uno",
+        "Marca como poca muestra los formatos con menos de 5 notas",
+        "No presenta como ganador un formato con menos de 5 notas",
+        "Las cifras que da coinciden con la base (mediana global 54 reacciones, 36 notas)"
+      ]
+    }
+  ]
+}
