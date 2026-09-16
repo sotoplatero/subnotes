@@ -1,6 +1,6 @@
 # La API pública de notas de Substack
 
-Lo que usa `sync.mjs`. Está aquí para que, si algún día cambia, se pueda arreglar sin
+Lo que usa el comando `sync`. Está aquí para que, si algún día cambia, se pueda arreglar sin
 adivinar. Todo verificado contra perfiles reales.
 
 ## Resolver el handle
@@ -14,7 +14,7 @@ Si el handle no existe responde **404** con `{"error":"profile not found"}`.
 
 El handle es el de `substack.com/@handle`, **no** el dominio de la publicación. Una persona
 puede tener `objetobrillante.substack.com` como publicación y otro handle distinto como
-perfil. `sync.mjs` rechaza a propósito cualquier entrada con un punto: es más honesto fallar
+perfil. `sync` rechaza a propósito cualquier entrada con un punto: es más honesto fallar
 que sincronizar la cuenta equivocada.
 
 ## Bajar las notas
@@ -32,7 +32,7 @@ Devuelve `{ items: [...], nextCursor, originalCursorTimestamp }`.
   `date` (ISO), `reaction_count`, `restacks`, `children_count`, `attachments[]`,
   `ancestor_path`, `user_id`, `post_id`, `publication_id`.
 
-**Filtro que aplica `sync.mjs`:** solo entra lo que cumple `comment.user_id === user_id` y
+**Filtro que aplica `sync`:** solo entra lo que cumple `comment.user_id === user_id` y
 `ancestor_path` vacío. Es decir, notas propias de primer nivel. Las respuestas a otros y los
 restacks ajenos se cuentan aparte pero no se guardan: son otro registro de escritura y
 mezclarlos ensucia el perfil de voz.
@@ -47,5 +47,5 @@ a mano en Substack — y entonces es un dato aportado por el autor, no un dato d
 ## Límites y cortesía
 
 Sin autenticación, sin cookies, leyendo lo mismo que cualquier visitante. Aun así Substack
-frena: si responde **429**, `sync.mjs` para, lo dice y deja guardado lo que ya bajó. Se
+frena: si responde **429**, `sync` para, lo dice y deja guardado lo que ya bajó. Se
 reanuda más tarde y el sync incremental retoma donde estaba. No conviene insistir en bucle.

@@ -28,6 +28,8 @@ Hay que reiniciar la sesión para que el agente lo cargue.
 dependencias, sin `npm install`, sin claves de API. No inicia sesión en Substack: lee lo
 mismo que vería cualquier visitante.
 
+Todo se lanza con `node scripts/subnotes.mjs <comando>`; sin argumentos imprime la ayuda. `--handle` solo hace falta si llevas varios perfiles.
+
 ## Cómo se usa
 
 La primera vez, dale tu handle y deja que bootee:
@@ -46,9 +48,8 @@ real, avisando si el tema ya salió en tu histórico.
 
 | | |
 |---|---|
-| `scripts/sync.mjs` | Baja tus notas del perfil público a SQLite. Incremental; `--full` la primera vez |
-| `scripts/query.mjs` | `estado`, `perfil`, `muestra`, `top`, `buscar`, `stats`, `formatos`, `etiquetar`, `export` |
-| `scripts/db.mjs` | Esquema e inserción, con histórico de métricas |
+| `scripts/subnotes.mjs` | Todo: `sync`, `estado`, `stats`, `muestra`, `top`, `buscar`, `formatos`, `etiquetar`, `etiquetar-aplicar`, `perfil`. Sin argumentos, la ayuda |
+| `scripts/db.mjs` | Esquema e inserción |
 | `references/perfil-de-voz.md` | Cómo se destila el perfil: dimensiones y regla de evidencia |
 | `references/formatos.md` | Catálogo de formatos y taxonomía para etiquetar el histórico |
 | `references/escribir-nota.md` | El procedimiento de escritura |

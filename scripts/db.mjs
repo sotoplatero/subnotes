@@ -5,12 +5,14 @@
  * Vive fuera para que reinstalar o mover el skill no se lleve por delante el
  * histórico, y para que un mismo Claude pueda llevar varios perfiles.
  *
- * Sin dependencias: node:sqlite viene en Node 22.5+. Es experimental y avisa por
- * stderr; los scripts se lanzan con --no-warnings=ExperimentalWarning.
+ * Sin dependencias: node:sqlite viene en Node 22.5+. Avisa de que es experimental
+ * por stderr, así que se importa con el aviso ya silenciado.
  */
-import { DatabaseSync } from 'node:sqlite';
+process.removeAllListeners('warning');
+const { DatabaseSync } = await import('node:sqlite');
+
 import { homedir } from 'node:os';
-import { mkdirSync, existsSync } from 'node:fs';
+import { mkdirSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const ROOT = process.env.SUBNOTES_DIR || join(homedir(), '.claude', 'subnotes');
@@ -21,12 +23,43 @@ export function dataDir(handle) {
 	return dir;
 }
 
-export function dbPath(handle) {
-	return join(dataDir(handle), 'notes.db');
-}
-
 export function hasProfile(handle) {
 	return existsSync(join(ROOT, handle.toLowerCase(), 'notes.db'));
+}
+
+/** Los handles que ya tienen base bajada. */
+export function perfiles() {
+	if (!existsSync(ROOT)) return [];
+	return readdirSync(ROOT, { withFileTypes: true })
+		.filter((d) => d.isDirectory() && existsSync(join(ROOT, d.name, 'notes.db')))
+		.map((d) => d.name);
+}
+
+/**
+ * De «@x», «substack.com/@x» o «x» al handle. null si es un dominio de
+ * publicación: es más honesto fallar que sincronizar la cuenta equivocada.
+ */
+export function normalizaHandle(input) {
+	let s = String(input || '').trim();
+	if (!s) return null;
+	if (/substack\.com\/@/i.test(s)) s = s.split('@').pop();
+	else if (s.startsWith('@')) s = s.slice(1);
+	s = s.split(/[/?#]/)[0].trim();
+	if (!s || /\s/.test(s) || s.includes('.')) return null;
+	return s.toLowerCase();
+}
+
+/**
+ * El handle de la orden, o el único que haya bajado. Pedir --handle cuando solo
+ * hay un perfil es fricción pura, y es el caso normal.
+ */
+export function resuelveHandle(input) {
+	const dado = normalizaHandle(input);
+	if (dado) return dado;
+	const hay = perfiles();
+	if (hay.length === 1) return hay[0];
+	if (!hay.length) return null;
+	throw new Error(`Hay varios perfiles bajados (${hay.join(', ')}): di cuál con --handle.`);
 }
 
 const SCHEMA = `
@@ -36,36 +69,22 @@ CREATE TABLE IF NOT EXISTS notes (
   user_id INTEGER,
   date TEXT,
   body TEXT,
-  body_json TEXT,
   reaction_count INTEGER DEFAULT 0,
   restacks INTEGER DEFAULT 0,
   children_count INTEGER DEFAULT 0,
   attachments_count INTEGER DEFAULT 0,
-  attachment_types TEXT,
-  post_id INTEGER,
-  publication_id INTEGER,
   url TEXT,
   chars INTEGER,
   words INTEGER,
   lines INTEGER,
   format TEXT,
   format_tagged_at TEXT,
-  raw TEXT,
   first_seen TEXT,
   last_seen TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_notes_date ON notes(date DESC);
 CREATE INDEX IF NOT EXISTS idx_notes_reactions ON notes(reaction_count DESC);
 CREATE INDEX IF NOT EXISTS idx_notes_format ON notes(format);
-
-CREATE TABLE IF NOT EXISTS metric_history (
-  note_id INTEGER NOT NULL,
-  seen_at TEXT NOT NULL,
-  reaction_count INTEGER,
-  restacks INTEGER,
-  children_count INTEGER,
-  PRIMARY KEY (note_id, seen_at)
-);
 
 CREATE TABLE IF NOT EXISTS profile (
   handle TEXT PRIMARY KEY,
@@ -80,10 +99,28 @@ CREATE TABLE IF NOT EXISTS profile (
 );
 `;
 
+/**
+ * Bases de antes guardaban el item entero de la API (`raw`), el `body_json` y un
+ * historial de métricas que ninguna consulta llegó a leer. Pesaban diez veces lo
+ * que hacía falta. Se tiran la primera vez que se abre la base.
+ */
+const SOBRAN = ['raw', 'body_json', 'post_id', 'publication_id', 'attachment_types'];
+
+function limpiaEsquemaViejo(db) {
+	const columnas = db.prepare('PRAGMA table_info(notes)').all().map((c) => c.name);
+	const tira = SOBRAN.filter((c) => columnas.includes(c));
+	const tabla = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='metric_history'").get();
+	if (!tira.length && !tabla) return;
+	for (const c of tira) db.exec(`ALTER TABLE notes DROP COLUMN ${c}`);
+	if (tabla) db.exec('DROP TABLE metric_history');
+	db.exec('VACUUM');
+}
+
 export function openDb(handle) {
-	const db = new DatabaseSync(dbPath(handle));
+	const db = new DatabaseSync(join(dataDir(handle), 'notes.db'));
 	db.exec('PRAGMA journal_mode = WAL;');
 	db.exec(SCHEMA);
+	limpiaEsquemaViejo(db);
 	return db;
 }
 
@@ -92,61 +129,41 @@ export function cleanBody(body) {
 	return (body || '').replace(/\r\n/g, '\n').trim();
 }
 
-export function countWords(text) {
-	const m = cleanBody(text).match(/\S+/g);
-	return m ? m.length : 0;
-}
-
 export function noteUrl(handle, id) {
 	return `https://substack.com/@${handle}/note/c-${id}`;
 }
 
-/**
- * Mete o actualiza una nota. Devuelve 'new' | 'updated' | 'same'.
- *
- * Las métricas solo se guardan en metric_history cuando cambian: una nota puede
- * seguir creciendo semanas después de publicarse, y la foto actual esconde eso.
- */
+/** Mete o actualiza una nota. Devuelve 'new' | 'updated' | 'same'. */
 export function upsertNote(db, item, handle) {
 	const c = item.comment || {};
 	if (!c.id) return 'skip';
 	const now = new Date().toISOString();
 	const body = cleanBody(c.body);
-	const atts = Array.isArray(c.attachments) ? c.attachments : [];
+	const palabras = body.match(/\S+/g);
 	const row = {
 		id: c.id,
 		handle: handle.toLowerCase(),
 		user_id: c.user_id ?? null,
 		date: c.date ?? null,
 		body,
-		body_json: c.body_json ? JSON.stringify(c.body_json) : null,
 		reaction_count: c.reaction_count ?? 0,
 		restacks: c.restacks ?? 0,
 		children_count: c.children_count ?? 0,
-		attachments_count: atts.length,
-		attachment_types: atts.length ? [...new Set(atts.map((a) => a.type || 'unknown'))].join(',') : null,
-		post_id: c.post_id ?? null,
-		publication_id: c.publication_id ?? null,
+		attachments_count: Array.isArray(c.attachments) ? c.attachments.length : 0,
 		url: noteUrl(handle, c.id),
 		chars: body.length,
-		words: countWords(body),
+		words: palabras ? palabras.length : 0,
 		lines: body ? body.split('\n').filter((l) => l.trim()).length : 0,
-		raw: JSON.stringify(item),
 	};
 
 	const prev = db.prepare('SELECT reaction_count, restacks, children_count FROM notes WHERE id = ?').get(row.id);
 
 	if (!prev) {
-		db.prepare(`INSERT INTO notes (id, handle, user_id, date, body, body_json, reaction_count,
-			restacks, children_count, attachments_count, attachment_types, post_id, publication_id,
-			url, chars, words, lines, raw, first_seen, last_seen)
-			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-			row.id, row.handle, row.user_id, row.date, row.body, row.body_json, row.reaction_count,
-			row.restacks, row.children_count, row.attachments_count, row.attachment_types, row.post_id,
-			row.publication_id, row.url, row.chars, row.words, row.lines, row.raw, now, now,
-		);
-		db.prepare('INSERT OR REPLACE INTO metric_history VALUES (?,?,?,?,?)').run(
-			row.id, now, row.reaction_count, row.restacks, row.children_count,
+		db.prepare(`INSERT INTO notes (id, handle, user_id, date, body, reaction_count, restacks,
+			children_count, attachments_count, url, chars, words, lines, first_seen, last_seen)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+			row.id, row.handle, row.user_id, row.date, row.body, row.reaction_count, row.restacks,
+			row.children_count, row.attachments_count, row.url, row.chars, row.words, row.lines, now, now,
 		);
 		return 'new';
 	}
@@ -156,20 +173,13 @@ export function upsertNote(db, item, handle) {
 		prev.restacks !== row.restacks ||
 		prev.children_count !== row.children_count;
 
-	db.prepare(`UPDATE notes SET body = ?, body_json = ?, reaction_count = ?, restacks = ?,
-		children_count = ?, attachments_count = ?, attachment_types = ?, chars = ?, words = ?,
-		lines = ?, raw = ?, last_seen = ? WHERE id = ?`).run(
-		row.body, row.body_json, row.reaction_count, row.restacks, row.children_count,
-		row.attachments_count, row.attachment_types, row.chars, row.words, row.lines, row.raw, now, row.id,
+	db.prepare(`UPDATE notes SET body = ?, reaction_count = ?, restacks = ?, children_count = ?,
+		attachments_count = ?, chars = ?, words = ?, lines = ?, last_seen = ? WHERE id = ?`).run(
+		row.body, row.reaction_count, row.restacks, row.children_count,
+		row.attachments_count, row.chars, row.words, row.lines, now, row.id,
 	);
 
-	if (changed) {
-		db.prepare('INSERT OR REPLACE INTO metric_history VALUES (?,?,?,?,?)').run(
-			row.id, now, row.reaction_count, row.restacks, row.children_count,
-		);
-		return 'updated';
-	}
-	return 'same';
+	return changed ? 'updated' : 'same';
 }
 
 export function mediana(nums) {
@@ -177,6 +187,26 @@ export function mediana(nums) {
 	if (!a.length) return 0;
 	const m = Math.floor(a.length / 2);
 	return a.length % 2 ? a[m] : Math.round((a[m - 1] + a[m]) / 2);
+}
+
+export function percentil(nums, p) {
+	const a = [...nums].filter((n) => Number.isFinite(n)).sort((x, y) => x - y);
+	if (!a.length) return 0;
+	return a[Math.min(a.length - 1, Math.floor(a.length * p))];
+}
+
+/** Sin tildes y en minúsculas: «boletín» y «Boletin» son la misma palabra. */
+export const plano = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/**
+ * Los slugs del catálogo, leídos de references/formatos.md. La lista vive en un
+ * sitio solo: el documento que el agente lee para clasificar.
+ */
+export function slugsConocidos() {
+	try {
+		const md = readFileSync(join(import.meta.dirname, '..', 'references', 'formatos.md'), 'utf8');
+		return [...md.matchAll(/^\|\s*`([a-z-]+)`\s*\|/gm)].map((m) => m[1]);
+	} catch { return []; }
 }
 
 /** Argumentos estilo --clave valor / --bandera, sin dependencias. */

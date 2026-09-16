@@ -22,7 +22,7 @@
       "prompt": "escribeme una nota sobre por que las relaciones directas con los lectores valen mas que el alcance",
       "expected_output": "Tres variantes en bloques de código listos para copiar, con formatos tomados del ranking real del autor, tono elegido por el modelo y longitud dentro de su rango habitual.",
       "files": [
-        "fixtures/hamish (notes.db + VOZ.md)"
+        "fixtures/hamish (notes.db + VOZ.md) — no versionado: se regenera con node scripts/subnotes.mjs sync hamish --full"
       ],
       "assertions": [
         "Entrega tres variantes, cada una en su propio bloque de codigo",
@@ -40,7 +40,7 @@
       "prompt": "oye antes de escribir nada: ¿ya he hablado de Substack TV en mis notas? y de paso dime que formato me esta funcionando mejor",
       "expected_output": "Encuentra la nota real sobre Substack TV con su id y fecha, y da el ranking de formatos marcando los que tienen poca muestra.",
       "files": [
-        "fixtures/hamish (notes.db + VOZ.md)"
+        "fixtures/hamish (notes.db + VOZ.md) — no versionado: se regenera con node scripts/subnotes.mjs sync hamish --full"
       ],
       "assertions": [
         "Encuentra la nota real sobre Substack TV con su id (#297269951) y su fecha (2026-07-18)",

@@ -18,9 +18,9 @@ exactamente lo que convierte el perfil en genérico.
 ## De dónde salen los datos
 
 ```bash
-node --no-warnings=ExperimentalWarning scripts/query.mjs muestra --handle <handle> --n 60
-node --no-warnings=ExperimentalWarning scripts/query.mjs stats   --handle <handle>
-node --no-warnings=ExperimentalWarning scripts/query.mjs top     --handle <handle> --n 15
+node scripts/subnotes.mjs muestra --n 60
+node scripts/subnotes.mjs stats
+node scripts/subnotes.mjs top --n 15
 ```
 
 `muestra` mezcla a propósito rendimiento alto, medio y bajo, y longitudes distintas. Es la
@@ -95,7 +95,7 @@ publica se mueve; un perfil de hace un año miente con confianza.
 Después de escribir `VOZ.md`, deja constancia en la base para saber cuándo toca reperfilar:
 
 ```bash
-node --no-warnings=ExperimentalWarning scripts/query.mjs perfil --handle <handle> --version v0.1
+node scripts/subnotes.mjs perfil --version v0.1
 ```
 
-(`query.mjs estado` avisa solo cuando hay ≥30 notas nuevas desde entonces o pasan 60 días.)
+(`subnotes.mjs estado` avisa solo cuando hay ≥30 notas nuevas desde entonces o pasan 60 días.)

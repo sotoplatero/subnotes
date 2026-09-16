@@ -7,39 +7,6 @@ que a ti te ha funcionado.
 
 El catálogo propone. **Tus datos mandan.**
 
-## Cómo se usa el ranking
-
-```bash
-node --no-warnings=ExperimentalWarning scripts/query.mjs formatos --handle <handle>
-```
-
-Devuelve, por formato: cuántas notas tuyas lo usan, la mediana de reacciones, la mediana de
-longitud y dos ejemplos. Ordenado por mediana.
-
-Dos cautelas que evitan conclusiones falsas:
-
-- **Menos de 5 notas no es un ganador.** El script lo marca. Un formato con dos notas y una
-  de ellas viral dice más de la suerte que del formato.
-- **Se compara contra tu mediana global**, no contra nada externo. Un formato «bueno» es el
-  que supera tu propia mediana.
-
-## Etiquetar el histórico
-
-Una vez, y queda guardado en `notes.format`:
-
-```bash
-node --no-warnings=ExperimentalWarning scripts/query.mjs etiquetar pendientes --handle <handle> --n 40
-# clasificar cada nota contra la tabla de abajo, y guardar:
-node --no-warnings=ExperimentalWarning scripts/query.mjs etiquetar aplicar --archivo etiquetas.json --handle <handle>
-```
-
-`etiquetas.json` es `{"<id de nota>": "<slug de formato>"}`. Usa **los slugs exactos** de la
-tabla; si una nota no encaja en ninguno, `otro` — es información honesta, y si `otro` crece
-mucho es que a esta lista le falta un formato tuyo (añádelo aquí, no lo fuerces).
-
-Una nota puede parecerse a dos formatos. Elige el que explique **por qué el lector se para**:
-lo que hace el trabajo, no lo que decora.
-
 ## El catálogo
 
 | Slug | Qué es | Cuándo funciona |
@@ -48,25 +15,53 @@ lo que hace el trabajo, no lo que decora.
 | `sentencia` | Una o dos frases, sin contexto, para citar | Cuando la idea aguanta sola. Es el formato más difícil de fingir |
 | `opinion-con-filo` | Postura clara contra algo que se da por sentado | Cuando de verdad piensas eso y puedes sostenerlo en los comentarios |
 | `dato-contraintuitivo` | Un número o hecho que descoloca, más tu lectura | Cuando el dato es verificable. Si no lo es, no se publica |
-| `confesion` | Algo que te salió mal, te costó o te da apuro | Cuando sirve al lector, no cuando busca consuelo |
+| `confesion` | Algo que te salió mal, te costó, o que pensabas antes y ya no | Cuando sirve al lector, no cuando busca consuelo |
 | `micro-historia` | Escena mínima con tensión y remate | Cuando hay un detalle concreto. Una anécdota sin detalle es relleno |
 | `lista-corta` | 3–5 puntos, una línea cada uno | Cuando el material es de verdad enumerable; si no, queda a hueco |
 | `detras-de-camaras` | Cómo se hace algo tuyo por dentro | Cuando enseña el proceso, no el resultado |
-| `pregunta-abierta` | Una pregunta que te interesa de verdad | Cuando quieres respuestas. Preguntar por preguntar se nota y no convierte |
-| `cita-comentada` | Frase de otro + qué te hace pensar | Cuando tu comentario aporta más que la cita |
-| `antes-despues` | Cómo pensabas antes, qué te hizo cambiar | Cuando el cambio es honesto y reciente |
-| `recomendacion` | Señalar el trabajo de otro | Cuando lo has leído. Substack premia esto más que otras redes |
-| `anuncio` | Empujar un post, un lanzamiento, algo tuyo | Con cuentagotas: el histórico suele mostrar que rinde por debajo de la mediana, y conviene decírselo al autor con su propio número |
-| `tutorial-prompt` | Pasos copiables o un prompt entero regalado en la nota | Cuando el lector puede ejecutarlo hoy sin ti. Si hay que comprar algo para usarlo, no es esto |
+| `tutorial-prompt` | Pasos copiables o un prompt entero regalado en la nota | Cuando el lector puede ejecutarlo hoy sin ti |
 | `explicacion` | Desmontar un concepto técnico en lenguaje llano | Cuando el término asusta más que la cosa («skills», «claude code») |
-| `otro` | No encaja en ninguno | Etiqueta legítima. Si abunda, falta un formato en esta lista |
+| `recomendacion` | Señalar el trabajo de otro, o comentar una cita suya | Cuando lo has leído y tu comentario aporta. Substack premia esto más que otras redes |
+| `anuncio` | Empujar un post, un lanzamiento, algo tuyo | Con cuentagotas: suele rendir por debajo de la mediana, y conviene decírselo al autor con su propio número |
+| `otro` | No encaja en ninguno | Etiqueta legítima. Si abunda, falta un formato en esta lista: añádelo aquí, no lo fuerces |
+
+Doce y pico, a propósito: con un catálogo más largo cada formato se queda con tres notas y
+el ranking no decide nada. Una nota puede parecerse a dos: elige el que explique **por qué el
+lector se para**, lo que hace el trabajo, no lo que decora.
+
+## El ranking
+
+```bash
+node scripts/subnotes.mjs formatos
+```
+
+Por formato: cuántas notas tuyas lo usan, la mediana de reacciones, la de longitud y dos
+ejemplos, ordenado por mediana y contra **tu** mediana global — un formato «bueno» es el que
+la supera. Los que no llegan a 5 notas salen marcados: con dos notas y una viral, lo que mide
+es la suerte.
+
+## Etiquetar el histórico
+
+No hace falta hacerlo entero, ni antes de escribir nada. La primera vez que el ranking vaya a
+usarse, etiqueta un lote y sigue:
+
+```bash
+node scripts/subnotes.mjs etiquetar --n 40
+node scripts/subnotes.mjs etiquetar-aplicar --datos '{"320752864":"sentencia","318456275":"opinion-con-filo"}'
+```
+
+Vienen de mayor a menor rendimiento, así que las primeras 40 son justo las que más pesan en
+el ranking. Usa **los slugs exactos** de la tabla: un slug que no esté en ella se rechaza en vez de
+colarse en el ranking como un formato fantasma con n=1. Con 40–60 etiquetadas ya hay ranking útil;
+lo que quede se etiqueta otro día y el ranking mejora solo. (`--archivo lote.json` si
+prefieres un fichero.)
 
 ## Cómo se elige formato al escribir
 
-De las tres variantes que se entregan: **dos con formatos del top del autor** (con muestra
-suficiente) y **una con un formato que apenas ha usado**. Repetir solo lo que ya rinde
-estrecha la voz hasta convertirla en un tic, y la tercera variante es barata: si no gusta,
-se descarta y no ha costado nada.
+De las tres variantes: **dos con formatos del top del autor** (con muestra suficiente) y
+**una con un formato que apenas ha usado**. Repetir solo lo que ya rinde estrecha la voz
+hasta convertirla en un tic, y la tercera variante es barata: si no gusta, se descarta.
 
-Si el material solo admite un formato —un dato es un dato—, no se fuerzan tres: se dicen dos
-buenas y se explica por qué la tercera no venía a cuento.
+Si el material solo admite un formato —un dato es un dato—, no se fuerzan tres: se dan dos
+buenas y se explica por qué la tercera no venía a cuento. Y si aún no hay nada etiquetado,
+se dice y se elige por criterio, no se inventa un ranking.
