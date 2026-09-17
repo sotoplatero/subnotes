@@ -11,9 +11,9 @@
  */
 import {
 	openDb, hasProfile, perfiles, resuelveHandle, normalizaHandle, dataDir,
-	mediana, percentil, plano, slugsConocidos, parseArgs, upsertNote,
+	mediana, percentil, plano, raiz, esVacia, slugsConocidos, parseArgs, upsertNote,
 } from './db.mjs';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, copyFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const COMANDOS = [];
@@ -46,8 +46,15 @@ const todas = ({ db, args }) => {
 // ────────────────────────────────────────────────────────────────────── sync
 
 comando('sync [<handle>] [--full] [--max N]', 'baja o actualiza las notas del perfil público', async ({ args }) => {
-	const handle = normalizaHandle(args._[1] || args.handle) || resuelveHandle();
-	if (!handle) throw new Error('Uso: sync <handle|https://substack.com/@handle> [--full]\nSi lo que tienes es el dominio de la publicación, el handle del perfil es otra cosa: míralo en substack.com/@...');
+	// «No me diste nada» y «me diste algo que no vale» son casos distintos: sin esta
+	// distinción, pasar el dominio de la publicación sincronizaba otro perfil en silencio.
+	const dado = args._[1] ?? (typeof args.handle === 'string' ? args.handle : undefined);
+	const handle = dado === undefined ? resuelveHandle() : normalizaHandle(dado);
+	if (!handle) {
+		throw new Error(dado === undefined
+			? 'Uso: sync <handle|https://substack.com/@handle> [--full]'
+			: `«${dado}» no es un handle de perfil. El handle es el de substack.com/@handle; si lo que tienes es el dominio de la publicación, el del perfil es otra cosa y hay que mirarlo en substack.com/@...`);
+	}
 
 	const perfil = await pide(`${API}/user/${encodeURIComponent(handle)}/public_profile`)
 		.catch((e) => {
@@ -116,7 +123,7 @@ comando('sync [<handle>] [--full] [--max N]', 'baja o actualiza las notas del pe
 
 // ───────────────────────────────────────────────────────────────────── estado
 
-comando('estado', 'qué hay en la base, y si toca resincronizar o reperfilar', ({ db, handle }) => {
+comando('estado', 'qué hay en la base, si toca reperfilar, y cómo va lo último', ({ db, handle, args }) => {
 	const p = db.prepare('SELECT * FROM profile WHERE handle = ?').get(handle) || {};
 	const total = db.prepare('SELECT COUNT(*) AS n FROM notes').get().n;
 	const r = db.prepare('SELECT MIN(date) AS desde, MAX(date) AS hasta FROM notes').get();
@@ -124,12 +131,25 @@ comando('estado', 'qué hay en la base, y si toca resincronizar o reperfilar', (
 	const dias = p.last_sync ? Math.floor((Date.now() - Date.parse(p.last_sync)) / 86400000) : null;
 	const nuevas = p.voice_notes_count != null ? total - p.voice_notes_count : null;
 	const desfasado = nuevas != null && (nuevas >= 30 || (dias != null && dias > 60));
-	const datos = { ...p, total, ...r, sin_formato: sinFormato, dias_desde_sync: dias, nuevas_desde_perfil: nuevas, perfil_desfasado: desfasado };
+	// El registro vive en la base y el archivo en disco: si no se comprueban los dos,
+	// el estado puede decir que hay perfil cuando lo que hay es la nota de que lo hubo.
+	const voz = existsSync(join(dataDir(handle), 'VOZ.md'));
+	// Cierra el bucle: lo único que dice si el perfil sirve es cómo van las últimas notas
+	// contra la mediana de siempre. Ambas cifras salen de la base.
+	const n = Number(args.ultimas ?? 10);
+	const ultimas = db.prepare('SELECT reaction_count FROM notes ORDER BY date DESC LIMIT ?').all(n).map((x) => x.reaction_count);
+	const medReciente = mediana(ultimas), medGlobal = mediana(db.prepare('SELECT reaction_count FROM notes').all().map((x) => x.reaction_count));
+	const datos = { ...p, total, ...r, sin_formato: sinFormato, dias_desde_sync: dias,
+		nuevas_desde_perfil: nuevas, perfil_desfasado: desfasado, voz_en_disco: voz,
+		mediana_ultimas: medReciente, ultimas: ultimas.length, mediana_global: medGlobal };
 	return { datos, texto() {
 		console.log(`@${handle} · ${p.name ?? ''}`);
 		console.log(`  ${total} notas, de ${(r.desde || '?').slice(0, 10)} a ${(r.hasta || '?').slice(0, 10)}`);
 		console.log(`  último sync: ${p.last_sync ?? 'nunca'}${dias != null ? ` (hace ${dias} días)` : ''}`);
 		console.log(`  perfil de voz: ${p.voice_version ?? 'sin construir'}${p.voice_built_at ? ` del ${p.voice_built_at.slice(0, 10)}` : ''}`);
+		if (p.voice_version && !voz) console.log('  → registrado, pero VOZ.md no está en disco: hay que reescribirlo antes de usarlo.');
+		if (!p.voice_version && voz) console.log('  → hay VOZ.md sin registrar: pásale `perfil --version v0.1`.');
+		if (ultimas.length) console.log(`  últimas ${ultimas.length}: mediana ${medReciente} reac ${medReciente === medGlobal ? '=' : medReciente > medGlobal ? '>' : '<'} ${medGlobal} histórica`);
 		if (nuevas != null) console.log(`  notas nuevas desde el perfil: ${nuevas}`);
 		if (sinFormato) console.log(`  sin etiqueta de formato: ${sinFormato}`);
 		if (desfasado) console.log('  → el perfil se ha quedado viejo: conviene reperfilar.');
@@ -138,7 +158,7 @@ comando('estado', 'qué hay en la base, y si toca resincronizar o reperfilar', (
 
 // ────────────────────────────────────────────────────────────────────── stats
 
-comando('stats', 'tus medianas: longitud, forma, cadencia, reacciones', (ctx) => {
+comando('stats [--formato <slug>]', 'tus medianas: longitud, forma, cadencia, reacciones', (ctx) => {
 	const all = todas(ctx);
 	if (!all.length) throw new Error('La base está vacía.');
 	const fechas = all.map((n) => Date.parse(n.date)).filter(Number.isFinite).sort((a, b) => a - b);
@@ -173,8 +193,8 @@ comando('stats', 'tus medianas: longitud, forma, cadencia, reacciones', (ctx) =>
 
 // ───────────────────────────────────────────────────────────────────── muestra
 
-comando('muestra [--n 60]', 'muestra mezclada a propósito, para destilar la voz', (ctx) => {
-	const n = Number(ctx.args.n ?? 60);
+comando('muestra [--n 40] [--formato <slug>]', 'muestra mezclada a propósito, para destilar la voz', (ctx) => {
+	const n = Number(ctx.args.n ?? 40);
 	const all = todas(ctx);
 	if (!all.length) throw new Error('La base está vacía.');
 	// Mezclada a propósito: alto, medio y bajo rendimiento, y cortas y largas.
@@ -216,11 +236,14 @@ comando('top [--n 20] [--metrica restacks] [--formato <slug>] [--desde AAAA-MM-D
 
 // ────────────────────────────────────────────────────────────────────── buscar
 
-comando('buscar "<texto>" [--n 10]', '¿ya he hablado de esto? (ignora tildes y mayúsculas)', (ctx) => {
+comando('buscar "<texto>" [--n 10]', '¿ya he hablado de esto? (ignora tildes, mayúsculas y plurales)', (ctx) => {
 	const { args } = ctx;
 	const q = args._.slice(1).join(' ').trim() || String(args.q || '');
 	if (!q) throw new Error('Uso: buscar "<texto>"');
-	const terminos = plano(q).split(/\s+/).filter((t) => t.length > 2);
+	// Solo términos con contenido. Con «por, que, las, con» puntuando, una consulta en
+	// lenguaje natural devolvía cualquier nota y el skill afirmaba que el tema ya salió.
+	const terminos = [...new Set(plano(q).split(/[^a-z0-9ñ]+/).filter((t) => t.length > 2 && !esVacia(t)).map(raiz))];
+	if (!terminos.length) throw new Error(`«${q}» son todas palabras funcionales: dame 2-3 palabras con contenido del tema.`);
 	const all = todas(ctx);
 	const notas = all.map((nota) => {
 		const cuerpo = plano(nota.body || '');
@@ -228,10 +251,12 @@ comando('buscar "<texto>" [--n 10]', '¿ya he hablado de esto? (ignora tildes y 
 	}).filter((x) => x.aciertos > 0)
 		.sort((a, b) => b.aciertos - a.aciertos || b.reaction_count - a.reaction_count)
 		.slice(0, Number(args.n ?? 10));
-	return { datos: { handle: ctx.handle, consulta: q, encontradas: notas.length, notas }, texto() {
-		if (!notas.length) return console.log(`Nada parecido a «${q}» en las ${all.length} notas de @${ctx.handle}. Tema virgen.`);
-		console.log(`# ${notas.length} notas tuyas tocan «${q}» (de ${all.length})\n`);
+	const flojas = notas.filter((x) => x.aciertos === 1 && terminos.length > 2).length;
+	return { datos: { handle: ctx.handle, consulta: q, terminos, encontradas: notas.length, notas }, texto() {
+		console.log(`# Buscando ${terminos.map((t) => `«${t}»`).join(' ')} en las ${all.length} notas de @${ctx.handle}\n`);
+		if (!notas.length) return console.log('Ninguna las menciona. Tema virgen.');
 		for (const x of notas) console.log(`${x.aciertos}/${terminos.length} términos · ` + linea(x) + '---');
+		if (flojas) console.log(`(${flojas} de estas coinciden en un solo término: mira el texto antes de dar el tema por tratado.)`);
 	} };
 });
 
@@ -275,9 +300,9 @@ comando('etiquetar [--n 40]', 'las notas que faltan por clasificar, de mayor a m
 
 // Valida contra el catálogo y contra la base: un slug mal escrito se convertía en
 // un formato fantasma con n=1 que ensuciaba el ranking, y en silencio.
-comando('etiquetar-aplicar --datos {"<id>":"<slug>"}', 'guarda las etiquetas (o --archivo lote.json)', async ({ db, args }) => {
+comando('etiquetar-aplicar --datos {"<id>":"<slug>"}', 'guarda las etiquetas (o --archivo lote.json)', ({ db, args }) => {
 	const datos = args.archivo
-		? JSON.parse((await import('node:fs')).readFileSync(String(args.archivo), 'utf8'))
+		? JSON.parse(readFileSync(String(args.archivo), 'utf8'))
 		: JSON.parse(String(args.datos || '{}'));
 	const validos = slugsConocidos();
 	const existe = db.prepare('SELECT 1 FROM notes WHERE id = ?');
@@ -292,6 +317,9 @@ comando('etiquetar-aplicar --datos {"<id>":"<slug>"}', 'guarda las etiquetas (o 
 		n++;
 	}
 	const faltan = db.prepare('SELECT COUNT(*) AS n FROM notes WHERE format IS NULL').get().n;
+	// Si no se guardó nada y todo venía mal, que el código de salida lo diga: un 0 aquí
+	// deja creer que el lote entró.
+	if (!n && (malSlug.length || malId.length)) process.exitCode = 1;
 	return { datos: { etiquetadas: n, pendientes: faltan, slugs_desconocidos: malSlug, ids_inexistentes: malId }, texto() {
 		console.log(`${n} notas etiquetadas. Quedan ${faltan} sin formato.`);
 		if (malSlug.length) console.log(`  slugs que no están en el catálogo (no guardados): ${malSlug.join(', ')}`);
@@ -303,12 +331,25 @@ comando('etiquetar-aplicar --datos {"<id>":"<slug>"}', 'guarda las etiquetas (o 
 
 comando('perfil --version v0.1', 'registra que VOZ.md se ha escrito, y con cuántas notas', ({ db, handle, args }) => {
 	const version = String(args.version || 'v0.1');
+	const previa = db.prepare('SELECT voice_version FROM profile WHERE handle = ?').get(handle)?.voice_version;
 	const total = db.prepare('SELECT COUNT(*) AS n FROM notes').get().n;
 	const ahora = new Date().toISOString();
+	const voz = join(dataDir(handle), 'VOZ.md');
+	if (!existsSync(voz)) throw new Error(`No hay VOZ.md en ${voz}. Escríbelo primero: registrar un perfil que no existe deja el estado mintiendo.`);
+	// Reperfilar pisaba el archivo, y entonces la línea de «qué cambió» no se podía
+	// contrastar con nada. La versión anterior se queda al lado.
+	let copia = null;
+	if (previa && previa !== version) {
+		copia = join(dataDir(handle), `VOZ-${previa}.md`);
+		copyFileSync(voz, copia);
+	}
 	db.prepare('UPDATE profile SET voice_version = ?, voice_built_at = ?, voice_notes_count = ? WHERE handle = ?')
 		.run(version, ahora, total, handle);
-	return { datos: { handle, voice_version: version, voice_built_at: ahora, voice_notes_count: total },
-		texto: () => console.log(`Perfil de voz ${version} registrado para @${handle} sobre ${total} notas.`) };
+	return { datos: { handle, voice_version: version, voice_built_at: ahora, voice_notes_count: total, version_previa: previa ?? null, copia },
+		texto() {
+			console.log(`Perfil de voz ${version} registrado para @${handle} sobre ${total} notas.`);
+			if (copia) console.log(`  la ${previa} queda en ${copia}`);
+		} };
 });
 
 // ──────────────────────────────────────────────────────────── la API pública

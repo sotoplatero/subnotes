@@ -6,6 +6,8 @@ description: >-
   su newsletter; cuando quiera que aprendas, clones o analices su voz o su estilo de
   Substack; cuando pregunte si ya habló de un tema o qué notas suyas funcionaron mejor; o
   cuando pase su handle o la URL de su perfil de Substack — aunque no diga «nota» ni «skill».
+  Si lo que hay es un artículo ya publicado para trocear, eso es `subatomizer`: aquí se
+  escribe desde una idea, un encargo o el propio histórico.
 ---
 
 # subnotes — tus notas de Substack, con tus datos
@@ -41,7 +43,8 @@ Los datos van antes que las preguntas: esa es la diferencia con un cuestionario 
 1. **Pide el handle.** El de `substack.com/@handle`, no el dominio de la publicación. La URL
    entera vale. Si no existe, el script da un 404 limpio: no sigas inventando.
 2. **`subnotes.mjs sync <handle> --full`.** Enséñale el resumen: cuántas notas, desde cuándo.
-3. **`subnotes.mjs muestra --n 60`** y **`subnotes.mjs stats`**.
+3. **`subnotes.mjs muestra`** y **`subnotes.mjs stats`**. La muestra trae 40 notas
+   repartidas; `--n 60` solo si el histórico es muy grande y la voz no queda clara.
 4. **Pregunta solo lo que la muestra no contesta.** Con `AskUserQuestion`, una sola llamada:
    a quién le escribe, qué temas quedan fuera, qué le da vergüenza ajena de sus propias
    notas, si las notas son escaparate del newsletter o cosa aparte. Longitud, tuteo, emojis,
@@ -62,7 +65,8 @@ Es el día a día. Lee `references/escribir-nota.md` y síguelo.
 
 ### 3. El perfil se ha quedado viejo
 
-`subnotes.mjs estado` lo avisa solo. Ofrece `subnotes.mjs sync` y, si han entrado
+`subnotes.mjs estado` lo avisa solo, y también avisa si `VOZ.md` falta en disco o si las
+últimas notas se han salido de su mediana. Ofrece `subnotes.mjs sync` y, si han entrado
 bastantes notas, reperfilar (`references/perfil-de-voz.md`).
 
 ## Las reglas que hacen esto útil
@@ -85,6 +89,9 @@ bastantes notas, reperfilar (`references/perfil-de-voz.md`).
 ## Lo que esto no hace
 
 - **No publica ni entra en tu cuenta.** Devuelve texto para copiar.
+- **No trocea artículos.** Si hay un texto publicado del que sacar notas ancladas a sus
+  frases, eso es `subatomizer`. Aquí se parte de una idea o un encargo, y el ancla son sus
+  notas anteriores.
 - **No audita la newsletter.** Para eso está `auditoria-substack`, con los CSV exportados.
 - **No baja notas ajenas para imitarlas.** Puede bajar cualquier perfil público, pero la voz
   que construye es para escribir como quien lo encarga, no para suplantar a nadie.

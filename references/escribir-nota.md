@@ -17,12 +17,17 @@ eso casi siempre es mejor nota que repetir el mismo argumento con otras palabras
 aparece nada, también se dice: «tema virgen» es información útil.
 
 **3. Trae las anclas.** 5–8 notas reales que se parezcan a lo que vas a escribir —por tema o
-por formato— con `buscar` o `top`. Escribir con texto suyo delante produce mucha mejor
-imitación que escribir con una descripción de su estilo.
+por formato— con `buscar`, `top` o `top --formato <slug>`. Escribir con texto suyo delante
+produce mucha mejor imitación que escribir con una descripción de su estilo.
+
+**Y etiqueta esas anclas de paso.** Ya las tienes leídas, así que clasificarlas no cuesta
+nada: las que vengan sin formato, mándalas con `etiquetar-aplicar`. Así el ranking se llena
+solo, unas pocas por sesión, sin que nadie pare a etiquetar cuarenta de golpe.
 
 **4. Elige formato** con su ranking real (`subnotes.mjs formatos`): dos de su top, uno que
-apenas haya usado. El detalle, en `formatos.md`. Si no hay nada etiquetado todavía, ese es el
-momento de etiquetar un lote de 40 — también está explicado allí.
+apenas haya usado. El detalle, en `formatos.md`. Si el ranking todavía está vacío o casi,
+elige por criterio y dilo —«aún no hay muestra para rankear»—; lo que no se hace es parar la
+nota para etiquetar cuarenta, ni inventar un ranking que no existe.
 
 **5. Elige el tono tú.** Nada de preguntar al usuario qué tono quiere: léelo del material.
 Un dato duro pide sequedad; una historia personal pide calma; una discusión pide filo. El
@@ -82,6 +87,9 @@ calibrado con sus datos, y qué probar si ninguna encaja. Sin sermones.
 - **El dato inventado.** Si la nota necesita una cifra, o está en el encargo o se pregunta.
 - **Los números que no existen.** Reacciones, restacks y respuestas son reales. Impresiones,
   alcance y suscriptores ganados no están en la base y no se estiman.
+- **Dar un tema por tratado con una coincidencia flaca.** `buscar` avisa cuando una nota solo
+  cruza en un término: eso es un parecido, no el mismo tema. Léela antes de decir «ya lo
+  dijiste», porque el autor sabe lo que ha escrito y ahí se cae la credibilidad del resto.
 - **La imitación de superficie**: copiar sus muletillas sin su forma de pensar. Por eso el
   apartado anti-imitación de `VOZ.md` se lee antes de escribir, no después.
 

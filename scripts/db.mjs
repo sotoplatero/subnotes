@@ -199,6 +199,22 @@ export function percentil(nums, p) {
 export const plano = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /**
+ * La raíz aproximada, para que «lectores» encuentre «lector» y no solo al revés.
+ * No es un lematizador: recorta el plural y se queda ahí a propósito.
+ */
+export const raiz = (t) => (t.length > 5 && t.endsWith('es') ? t.slice(0, -2) : t.length > 4 && t.endsWith('s') ? t.slice(0, -1) : t);
+
+/**
+ * Palabras funcionales. Las de 3-6 letras son el problema: pasan cualquier filtro
+ * de longitud y aparecen en casi todas las notas, así que puntúan sin informar.
+ */
+const VACIAS = new Set(`ademas algo algun alguna algunas alguno algunos ante antes aqui asi aun aunque bien cada casi como con cosa cual cuales cuando cuanto desde donde dos ella ellas ello ellos entre era eran eres esa esas ese eso esos esta estan estar estas este esto estos fue fueron hace hacer hacia han has hasta hay igual incluso jamas luego mas mientras mismo mucha muchas mucho muchos muy nada nadie ninguna ninguno nos nosotros nuestra nuestro nunca otra otras otro otros para pero poco pocos por porque pues que quien quienes segun ser sera siempre sido sin sino sobre solo son soy sus tal tambien tampoco tan tanto tiene tienen todas todo todos tras tus una uno unos vez ya yo
+	las los del ellas lla lle les mis nada sean vas van voy eso ese esa aca alli ahi cuya cuyo cuyas cuyos tener tengo tienes puede pueden podia debe deben esos unas cuanta cuantos
+	the and for with that this from your you are but not all any can has how its our out the was what when which who will would about into more some than then there these they` .trim().split(/\s+/));
+
+export const esVacia = (t) => VACIAS.has(t);
+
+/**
  * Los slugs del catálogo, leídos de references/formatos.md. La lista vive en un
  * sitio solo: el documento que el agente lee para clasificar.
  */

@@ -42,8 +42,11 @@ es la suerte.
 
 ## Etiquetar el histórico
 
-No hace falta hacerlo entero, ni antes de escribir nada. La primera vez que el ranking vaya a
-usarse, etiqueta un lote y sigue:
+Lo normal es que se etiquete solo: cada vez que escribes una nota traes 5–8 anclas y esas se
+clasifican de paso (paso 3 de `escribir-nota.md`). En diez notas escritas tienes ~50
+etiquetadas sin haber parado nunca.
+
+Si quieres forzarlo —porque el ranking hace falta ya—, hay lote:
 
 ```bash
 node scripts/subnotes.mjs etiquetar --n 40

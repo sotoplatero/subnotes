@@ -1,5 +1,6 @@
 {
   "skill_name": "subnotes",
+  "setup": "Los evals 1 y 2 necesitan una base ya bajada. Se crea en el momento, sin fixtures versionadas: SUBNOTES_DIR=./evals/tmp node scripts/subnotes.mjs sync hamish --full. Las cifras se comprueban contra la salida de `stats` y `formatos` de esa misma base, no contra números congelados en este archivo: las métricas de Substack se mueven.",
   "evals": [
     {
       "id": 0,
@@ -11,9 +12,10 @@
         "Descarga las notas de verdad: deja un notes.db con al menos 10 notas del perfil pedido",
         "Escribe VOZ.md en la carpeta de estado del handle",
         "VOZ.md apoya sus rasgos en ids de notas que existen realmente en la base (>=4 ids validos)",
-        "Registra el perfil de voz en la base (voice_version no nulo)",
+        "Registra el perfil de voz en la base (voice_version no nulo) y solo despues de escribir VOZ.md",
         "La respuesta declara que impresiones, alcance y suscriptores por nota NO estan en estos datos",
-        "La respuesta enseña lo inferido para que el usuario lo corrija, o lista lo que preguntaria"
+        "La respuesta enseña lo inferido para que el usuario lo corrija, o lista lo que preguntaria",
+        "No para a etiquetar el historico entero antes de terminar el booteo"
       ]
     },
     {
@@ -21,33 +23,32 @@
       "name": "escribir",
       "prompt": "escribeme una nota sobre por que las relaciones directas con los lectores valen mas que el alcance",
       "expected_output": "Tres variantes en bloques de código listos para copiar, con formatos tomados del ranking real del autor, tono elegido por el modelo y longitud dentro de su rango habitual.",
-      "files": [
-        "fixtures/hamish (notes.db + VOZ.md) — no versionado: se regenera con node scripts/subnotes.mjs sync hamish --full"
-      ],
+      "files": ["base creada en el setup (notes.db + VOZ.md)"],
       "assertions": [
         "Entrega tres variantes, cada una en su propio bloque de codigo",
         "Dentro de los bloques solo va el texto publicable (sin 'Variante', sin recuento de caracteres, sin comillas envolventes)",
         "Cada variante declara fuera del bloque su formato y su tono",
-        "Los formatos citados son slugs que existen en el ranking real del autor",
-        "Al menos dos variantes caen dentro del rango habitual de longitud del autor (15-215 caracteres)",
+        "Los formatos citados existen en references/formatos.md",
+        "Al menos dos variantes caen dentro del rango p10-p90 que reporta `stats` para esa base",
         "Comprueba el historico y dice si el tema ya salio, citando ids si los hay",
-        "No presenta impresiones, alcance ni suscriptores como si fueran datos disponibles"
+        "Si la coincidencia es de un solo termino, no la presenta como que el tema ya esta tratado",
+        "No presenta impresiones, alcance ni suscriptores como si fueran datos disponibles",
+        "No para la nota para etiquetar un lote de 40; como mucho etiqueta las anclas que ya trajo"
       ]
     },
     {
       "id": 2,
       "name": "historico",
       "prompt": "oye antes de escribir nada: ¿ya he hablado de Substack TV en mis notas? y de paso dime que formato me esta funcionando mejor",
-      "expected_output": "Encuentra la nota real sobre Substack TV con su id y fecha, y da el ranking de formatos marcando los que tienen poca muestra.",
-      "files": [
-        "fixtures/hamish (notes.db + VOZ.md) — no versionado: se regenera con node scripts/subnotes.mjs sync hamish --full"
-      ],
+      "expected_output": "Encuentra las notas reales sobre el tema con su id y fecha, y da el ranking de formatos marcando los que tienen poca muestra.",
+      "files": ["base creada en el setup (notes.db + VOZ.md)"],
       "assertions": [
-        "Encuentra la nota real sobre Substack TV con su id (#297269951) y su fecha (2026-07-18)",
+        "Busca en la base y cita el id y la fecha de las notas que encuentra",
+        "Si no encuentra ninguna, lo dice como 'tema virgen' en vez de improvisar",
         "Da el ranking de formatos con la mediana de reacciones de cada uno",
         "Marca como poca muestra los formatos con menos de 5 notas",
         "No presenta como ganador un formato con menos de 5 notas",
-        "Las cifras que da coinciden con la base (mediana global 54 reacciones, 36 notas)"
+        "Las cifras que da coinciden con la salida de `stats` y `formatos` de la base del setup"
       ]
     }
   ]
