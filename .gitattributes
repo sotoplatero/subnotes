@@ -1,2 +1,8 @@
 * text=auto eol=lf
 *.db binary
+
+# Fuera del paquete de release: es material del repo, no del skill instalado
+.gitattributes export-ignore
+.gitignore export-ignore
+.github export-ignore
+evals export-ignore

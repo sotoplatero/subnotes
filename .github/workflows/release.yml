@@ -1,0 +1,41 @@
+name: release
+
+# Una sola release rodante, sin versiones: el tag `latest` se mueve con main y
+# sus assets se rehacen en cada push. El enlace de descarga nunca cambia:
+#   https://github.com/sotoplatero/subnotes/releases/latest/download/subnotes.zip
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+jobs:
+  assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Empaquetar
+        run: |
+          git archive --format=zip --prefix=subnotes/ -o subnotes.zip HEAD
+          cp subnotes.zip subnotes.skill
+          unzip -l subnotes.zip
+
+      - name: Republicar la release `latest`
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest \
+            --target "$GITHUB_SHA" \
+            --title "subnotes (latest)" \
+            --notes "Última versión, construida desde \`main\` (${GITHUB_SHA:0:7}). Se rehace en cada cambio." \
+            subnotes.zip subnotes.skill
